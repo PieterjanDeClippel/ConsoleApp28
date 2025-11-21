@@ -5,12 +5,38 @@ Debugger.Break();
 
 static string[] FindGitRepositories(string searchPath, int maxDepth = int.MaxValue)
 {
-    var o = new EnumerationOptions();
+    if (string.IsNullOrWhiteSpace(searchPath) || !Directory.Exists(searchPath))
+        return [];
 
-    var gitRepos = new List<string>();
-    var directories = Directory.GetDirectories(searchPath, ".git", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = maxDepth, AttributesToSkip = FileAttributes.Normal | FileAttributes.System | FileAttributes.Temporary })
-        .Select(p => p.EndsWith(".git") ? p.Substring(0, p.Length - 4) : p)
-        .ToArray();
+    var results = new List<string>();
+    var stack = new Stack<(string path, int depth)>();
+    stack.Push((searchPath, 0));
 
-    return directories;
+    while (stack.Count > 0)
+    {
+        var (current, depth) = stack.Pop();
+        if (depth > maxDepth) continue;
+
+        var gitDir = Path.Combine(current, ".git");
+        if (Directory.Exists(gitDir))
+            results.Add(current);
+
+        if (depth == maxDepth) continue;
+
+        try
+        {
+            foreach (var dir in Directory.EnumerateDirectories(current))
+            {
+                var name = Path.GetFileName(dir);
+                if (name.Equals("node_modules", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                stack.Push((dir, depth + 1));
+            }
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (DirectoryNotFoundException) { }
+        catch (IOException) { }
+    }
+
+    return results.Distinct().ToArray();
 }
