@@ -1,7 +1,13 @@
 ﻿using System.Diagnostics;
 
-var allRepos = FindGitRepositories(@"C:\Repos");
+var gitRepos = FindGitRepositories(@"C:\Repos");
+var reposAndBranches = await Task.WhenAll(gitRepos.Select(async repo => new
+{
+    Repository = repo,
+    DefaultBranch = await GetDefaultBranchNameAsync(repo),
+}));
 Debugger.Break();
+
 
 static string[] FindGitRepositories(string searchPath, bool includeSubmodules = false, int maxDepth = int.MaxValue)
 {
@@ -44,4 +50,27 @@ static string[] FindGitRepositories(string searchPath, bool includeSubmodules = 
     }
 
     return results.Distinct().ToArray();
+}
+
+static async Task<string> GetDefaultBranchNameAsync(string repositoryPath)
+{
+    var process = Process.Start(new ProcessStartInfo
+    {
+        FileName = "powershell",
+        ArgumentList = {
+            "-NoProfile",
+            "-Command",
+            "git symbolic-ref --short \"refs/remotes/$(git remote | Select-Object -First 1)/HEAD\""
+        },
+        RedirectStandardOutput = true,
+        RedirectStandardError = true,
+        UseShellExecute = false,
+        WorkingDirectory = repositoryPath,
+    }) ?? throw new InvalidOperationException("Could not spawn powershell");
+
+    await process.WaitForExitAsync();
+    string output = process!.StandardOutput.ReadToEnd().Trim();
+    string error = process.StandardError.ReadToEnd().Trim();
+
+    return output;
 }
