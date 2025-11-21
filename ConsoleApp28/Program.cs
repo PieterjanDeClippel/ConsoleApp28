@@ -1,9 +1,9 @@
 ﻿using System.Diagnostics;
 
-var allRepos = FindGitRepositories(@"C:\Repos", 2);
+var allRepos = FindGitRepositories(@"C:\Repos");
 Debugger.Break();
 
-static string[] FindGitRepositories(string searchPath, int maxDepth = int.MaxValue)
+static string[] FindGitRepositories(string searchPath, bool includeSubmodules = false, int maxDepth = int.MaxValue)
 {
     if (string.IsNullOrWhiteSpace(searchPath) || !Directory.Exists(searchPath))
         return [];
@@ -19,7 +19,12 @@ static string[] FindGitRepositories(string searchPath, int maxDepth = int.MaxVal
 
         var gitDir = Path.Combine(current, ".git");
         if (Directory.Exists(gitDir))
+        {
             results.Add(current);
+
+            // Skip traversing deeper once a repository root is found
+            if (!includeSubmodules) continue;
+        }
 
         if (depth == maxDepth) continue;
 
